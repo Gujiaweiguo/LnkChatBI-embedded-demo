@@ -2,105 +2,101 @@
 import { computed, onMounted, reactive, ref } from 'vue'
 import { ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
-import {
-  SettingApi,
-  type BaseAssistantConfig,
-  type SettingRecord,
-  normalizeBaseAssistantConfig,
-} from '@/api/setting'
+import { SettingApi, type SettingRecord } from '@/api/setting'
+import { AssistantApi, type AssistantListItem } from '@/api/assistant'
 import { useSettingStore } from '@/store/setting'
 
 const settingStore = useSettingStore()
 const formRef = ref<FormInstance>()
 
-const workspaceScopeOptions = [
-  { label: '当前工作空间', value: 'current_workspace' },
-  { label: '调用方上下文', value: 'caller_context' },
-  { label: '全部工作空间', value: 'all_workspaces' },
-]
+interface BaseAssistantFormState {
+  domain: string
+  access_token: string
+  assistant_id: string
+}
 
-const datasourceExposureOptions = [
-  { label: '不暴露数据源', value: 'none' },
-  { label: '仅当前工作空间可见数据源', value: 'workspace_visible' },
-  { label: '仅授权数据源', value: 'authorized_only' },
-  { label: '全部已接入数据源', value: 'all_visible' },
-]
-
-const form = reactive<BaseAssistantConfig>(normalizeBaseAssistantConfig())
+const form = reactive<BaseAssistantFormState>({
+  domain: '',
+  access_token: '',
+  assistant_id: '',
+})
 
 const rules: FormRules = {
-  name: [{ required: true, message: '请输入基础助手名称', trigger: 'blur' }],
-  assistant_id: [{ required: true, message: '请输入运行时兼容 assistant_id', trigger: 'blur' }],
+  domain: [{ required: true, message: '请输入 LnkChatBI 服务地址', trigger: 'blur' }],
+  access_token: [{ required: true, message: '请填入 access_token', trigger: 'blur' }],
+  assistant_id: [{ required: true, message: '请选择基础小助手', trigger: 'change' }],
 }
 
-const hasDomain = computed(() => !!settingStore.getDomain)
+const assistantOptions = ref<AssistantListItem[]>([])
+const loadingList = ref(false)
+const listError = ref('')
 
-const formatBindingList = (ids: string[] = [], names: string[] = []) => {
-  if (!ids.length) {
-    return '无'
-  }
-
-  return ids
-    .map((id, index) => {
-      const name = names[index]
-      return name && name !== id ? `${name}（id=${id}）` : `id=${id}`
-    })
-    .join('、')
-}
-
-const bindingOverview = computed(() => {
-  const config = form
-  const workspaceName = config.workspace_names[0]
-  const workspaceId = config.workspace_ids[0]
-  const currentWorkspace = workspaceName && workspaceId ? `${workspaceName}（id=${workspaceId}）` : workspaceName || workspaceId || '未配置'
-  const currentDatasource = config.datasource_ids.length
-    ? formatBindingList(config.datasource_ids, config.datasource_names)
-    : formatBindingList(config.public_list, config.datasource_names)
-
-  return [
-    { label: '当前工作区', value: currentWorkspace },
-    { label: '工作区范围', value: config.workspace_scope || '未配置' },
-    { label: '当前绑定数据源', value: currentDatasource },
-    { label: '公开数据源', value: formatBindingList(config.public_list, config.public_list_names) },
-    { label: '私有数据源', value: formatBindingList(config.private_list, config.private_list_names) },
-    { label: '自动选择数据源', value: config.auto_ds ? '是' : '否' },
-    { label: '默认数据源', value: config.default_datasource_name ? `${config.default_datasource_name}（id=${config.default_datasource_id}）` : config.default_datasource_id ? `id=${config.default_datasource_id}` : '未配置' },
-  ]
+const currentAssistantName = computed(() => {
+  const match = assistantOptions.value.find((item) => item.id === form.assistant_id)
+  return match?.name || ''
 })
 
 const syncForm = () => {
-  Object.assign(form, normalizeBaseAssistantConfig(settingStore.getBaseAssistantConfig, settingStore.getBaseAssistantId))
+  form.domain = settingStore.getDomain
+  form.access_token = settingStore.getAccessToken
+  form.assistant_id = settingStore.getBaseAssistantId
 }
 
-const buildPayload = (): SettingRecord => ({
+const ensureStorePersisted = (): SettingRecord => ({
   ...settingStore.getData,
-  base_assistant_id: form.assistant_id.trim(),
+  domain: form.domain.trim().replace(/\/+$/, ''),
+  access_token: form.access_token.trim(),
+  base_assistant_id: form.assistant_id,
   base_assistant_config: {
-    ...form,
-    assistant_id: form.assistant_id.trim(),
-    name: form.name.trim(),
-    description: form.description.trim(),
-    cross_domain_origins: form.cross_domain_origins.trim(),
+    ...settingStore.getBaseAssistantConfig,
+    assistant_id: form.assistant_id,
+    name: currentAssistantName.value,
   },
 })
 
-const handleSubmit = async (formEl: FormInstance | undefined) => {
-  if (!formEl || !hasDomain.value) {
+const fetchList = async (silent = false) => {
+  if (!form.domain || !form.access_token) {
+    if (!silent) {
+      ElMessage.warning('请先填写服务地址和 access_token')
+    }
     return
   }
+  loadingList.value = true
+  listError.value = ''
+  try {
+    // 先把当前 domain/token 落库，让后端代理能用最新凭据拉取
+    await SettingApi.save(ensureStorePersisted())
+    await settingStore.init()
+    const res = await AssistantApi.list({ type: 'base' })
+    assistantOptions.value = (res?.data || []).filter((item) => item.type === 0)
+    if (!silent) {
+      ElMessage.success(`已加载 ${assistantOptions.value.length} 个基础小助手`)
+    }
+  } catch (err: any) {
+    listError.value = err?.message || '拉取助手列表失败'
+    if (!silent) {
+      ElMessage.error(listError.value)
+    }
+  } finally {
+    loadingList.value = false
+  }
+}
 
+const handleSubmit = async (formEl: FormInstance | undefined) => {
+  if (!formEl) {
+    return
+  }
   const valid = await formEl.validate().catch(() => false)
   if (!valid) {
     return
   }
-
   try {
-    const res = await SettingApi.save(buildPayload())
+    const res = await SettingApi.save(ensureStorePersisted())
     await settingStore.init(res.data)
-    ElMessage.success('基础助手配置保存成功')
+    ElMessage.success('基础小助手配置保存成功')
     window.location.reload()
   } catch {
-    ElMessage.error('基础助手配置保存失败')
+    ElMessage.error('基础小助手配置保存失败')
   }
 }
 
@@ -115,134 +111,94 @@ onMounted(() => {
       <div class="setting-page__eyebrow">Base assistant</div>
       <div class="setting-page__hero">
         <div class="setting-page__hero-copy">
-          <h2 class="setting-page__title">基础助手配置</h2>
+          <h2 class="setting-page__title">基础小助手配置</h2>
           <p class="setting-page__description">
-            按 thxtd basic 语义维护本地镜像配置：应用元信息、跨域策略、工作空间范围与数据源可见范围。
+            填写 LnkChatBI 服务地址与 access_token，从 LnkChatBI 拉取已创建的基础小助手列表，下拉选择当前 demo 要嵌入的小助手。
           </p>
-        </div>
-
-        <div class="setting-page__status">
-          <div class="setting-page__status-card">
-            <div class="setting-page__status-label">当前服务地址</div>
-            <div class="setting-page__status-value">{{ settingStore.getDomain || '请先在通用设置页配置' }}</div>
-          </div>
-          <div class="setting-page__status-card">
-            <div class="setting-page__status-label">Derived runtime ID</div>
-            <div class="setting-page__status-value">{{ form.assistant_id || '未配置' }}</div>
-          </div>
         </div>
       </div>
     </div>
 
     <div class="setting-page__content">
-      <el-alert
-        v-if="!hasDomain"
-        title="请先设置服务地址"
-        description="/api/setting 保存要求 domain 存在。请先回到“通用设置”填写当前服务地址，再保存基础助手配置。"
-        type="warning"
-        show-icon
-        :closable="false"
-      />
+      <el-form ref="formRef" :model="form" :rules="rules" label-position="top" status-icon>
+        <div class="setting-page__panel">
+          <div class="setting-page__panel-copy">
+            <h3 class="setting-page__panel-title">LnkChatBI 连接</h3>
+            <p class="setting-page__panel-description">
+              所有助手列表请求都通过 demo 后端代理调用 LnkChatBI <code>GET /api/v1/system/assistant</code>。
+            </p>
+          </div>
 
-      <div class="setting-page__panel">
-        <div class="setting-page__panel-copy">
-          <h3 class="setting-page__panel-title">数据源绑定概览</h3>
-          <p class="setting-page__panel-description">
-            展示当前从 SQLBot 同步过来的工作区与数据源绑定信息，用于确认基础小助手的访问范围。
-          </p>
-        </div>
+          <div class="setting-page__grid">
+            <el-form-item label="LnkChatBI 服务地址" prop="domain" class="setting-page__full">
+              <el-input v-model="form.domain" placeholder="例如：http://localhost:8000" clearable />
+            </el-form-item>
 
-        <div class="setting-page__meta-grid">
-          <div v-for="item in bindingOverview" :key="item.label" class="setting-page__meta-item">
-            <div class="setting-page__meta-label">{{ item.label }}</div>
-            <div class="setting-page__meta-value">{{ item.value }}</div>
+            <el-form-item label="access_token" prop="access_token" class="setting-page__full">
+              <el-input
+                v-model="form.access_token"
+                placeholder="从 LnkChatBI 浏览器 localStorage 的 user.token 拷贝"
+                type="password"
+                show-password
+                clearable
+              />
+            </el-form-item>
           </div>
         </div>
 
-        <p class="setting-page__meta-note">
-          基础小助手的数据源访问范围来自 SQLBot assistant 配置同步结果，当前页面仅展示本地镜像信息。
-        </p>
-      </div>
-
-      <el-form ref="formRef" :model="form" :rules="rules" label-position="top" status-icon>
         <div class="setting-page__panel">
           <div class="setting-page__panel-header">
             <div class="setting-page__panel-copy">
-              <h3 class="setting-page__panel-title">应用基础信息</h3>
-              <p class="setting-page__panel-description">维护 thxtd basic 的名称、说明与兼容 assistant_id，确保旧运行页仍能读取派生 ID。</p>
+              <h3 class="setting-page__panel-title">选择基础小助手</h3>
+              <p class="setting-page__panel-description">
+                点击下方按钮从 LnkChatBI 拉取 type=0 的助手列表。
+              </p>
             </div>
-            <div class="setting-page__tag">运行时兼容字段保留</div>
+            <el-button
+              type="primary"
+              plain
+              :loading="loadingList"
+              @click="fetchList(false)"
+            >
+              {{ loadingList ? '拉取中...' : '拉取助手列表' }}
+            </el-button>
           </div>
 
           <div class="setting-page__grid">
-            <el-form-item label="兼容 assistant_id" prop="assistant_id">
-              <el-input v-model="form.assistant_id" placeholder="请输入 thxtd basic 对应的兼容 assistant_id" clearable />
-            </el-form-item>
-
-            <el-form-item label="应用名称" prop="name">
-              <el-input v-model="form.name" placeholder="例如：thxtd 基础助手" clearable />
-            </el-form-item>
-
-            <el-form-item label="应用说明" class="setting-page__full">
-              <el-input
-                v-model="form.description"
-                type="textarea"
-                :rows="4"
-                placeholder="说明当前工作空间内 thxtd basic 的适用场景与能力边界"
-              />
-            </el-form-item>
-          </div>
-        </div>
-
-        <div class="setting-page__panel">
-          <div class="setting-page__panel-copy">
-            <h3 class="setting-page__panel-title">跨域与暴露策略</h3>
-              <p class="setting-page__panel-description">配置 thxtd basic 在当前工作空间下的跨域能力、作用范围与数据源可见语义。</p>
-          </div>
-
-          <div class="setting-page__grid">
-            <el-form-item label="开启跨域" prop="cross_domain_enabled">
-              <el-switch v-model="form.cross_domain_enabled" />
-            </el-form-item>
-
-            <el-form-item label="工作空间范围" prop="workspace_scope">
-              <el-select v-model="form.workspace_scope" placeholder="请选择工作空间范围" clearable>
+            <el-form-item label="基础小助手" prop="assistant_id" class="setting-page__full">
+              <el-select
+                v-model="form.assistant_id"
+                placeholder="请拉取并选择基础小助手"
+                filterable
+                :loading="loadingList"
+                style="width: 100%"
+              >
                 <el-option
-                  v-for="item in workspaceScopeOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
-                />
-              </el-select>
-            </el-form-item>
-
-            <el-form-item label="允许跨域来源" class="setting-page__full" v-if="form.cross_domain_enabled">
-              <el-input
-                v-model="form.cross_domain_origins"
-                type="textarea"
-                :rows="3"
-                placeholder="多个来源可使用逗号分隔，例如：https://demo.example.com,https://ops.example.com"
-              />
-            </el-form-item>
-
-             <el-form-item label="数据源可见范围" class="setting-page__full" prop="datasource_exposure">
-               <el-select v-model="form.datasource_exposure" placeholder="请选择数据源可见策略">
-                <el-option
-                  v-for="item in datasourceExposureOptions"
-                  :key="item.value"
-                  :label="item.label"
-                  :value="item.value"
+                  v-for="item in assistantOptions"
+                  :key="item.id"
+                  :label="`${item.name}（id=${item.id}）`"
+                  :value="item.id"
                 />
               </el-select>
             </el-form-item>
           </div>
+
+          <el-alert
+            v-if="listError"
+            :title="listError"
+            type="error"
+            show-icon
+            :closable="false"
+          />
         </div>
       </el-form>
     </div>
 
     <div class="setting-page__footer">
-      <div class="setting-page__footer-note">保存后会通过 <code>/api/setting</code> 同步结构化 <code>base_assistant_config</code>，并继续派生兼容的 <code>base_assistant_id</code>。</div>
-      <el-button type="primary" size="large" :disabled="!hasDomain" @click="handleSubmit(formRef)">保存基础助手配置</el-button>
+      <div class="setting-page__footer-note">
+        保存后会通过 <code>/api/setting</code> 同步服务地址、access_token 与基础小助手 ID，菜单随后出现「基础小助手」入口。
+      </div>
+      <el-button type="primary" size="large" @click="handleSubmit(formRef)">保存基础小助手配置</el-button>
     </div>
   </div>
 </template>
