@@ -24,7 +24,7 @@ test.describe('Login Flow', () => {
     const passwordInput = dialog.locator('input[type="password"]').first()
 
     await expect(usernameInput).toHaveValue('developer')
-    await expect(passwordInput).toHaveValue('SQLBotDemo@123')
+    await expect(passwordInput).toHaveValue('LnkChatBIDemo@123')
 
     const loginButton = dialog.locator('button:has-text("登录")')
     await loginButton.click()

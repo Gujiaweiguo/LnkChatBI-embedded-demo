@@ -10,7 +10,7 @@ import axios, {
 
 import { useCache } from '@/utils/useCache'
 import { ElMessage } from 'element-plus'
-const token_key = 'sqlbot-embedded-token'
+const token_key = 'lnkchatbi-embedded-token'
 const { wsCache } = useCache()
 export interface ApiResponse<T = unknown> {
   code: number

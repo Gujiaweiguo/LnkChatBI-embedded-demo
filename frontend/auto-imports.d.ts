@@ -7,7 +7,7 @@
 export {}
 declare global {
   interface Window {
-    sqlbot_assistant_handler?: {
+    lnkchatbi_assistant_handler?: {
       [key: string]: {
         destroy: () => void
         refresh: (online: boolean, userFlag: number | string) => void
@@ -15,7 +15,7 @@ declare global {
         createConversation: (param?: any) => void
       }
     },
-    sqlbot_embedded_handler?: {
+    lnkchatbi_embedded_handler?: {
       mounted: (selector: string, config: any) => void;
       refresh: (online: boolean, userFlag: number | string) => void;
       destroy: (id: string, deep?: boolean) => void

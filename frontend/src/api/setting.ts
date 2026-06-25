@@ -39,42 +39,18 @@ export interface AdvancedAssistantConfig {
   timeout: number
   aes_enable: boolean
   aes_key: string
-  workspace_ids: string[]
-  datasource_ids: string[]
-  workspace_names: string[]
-  datasource_names: string[]
-  auto_ds: boolean
-  default_datasource_id: string | null
-  default_datasource_name: string
   credential_mappings: CredentialMapping[]
-}
-
-export interface EmbeddedAssistantAppConfig {
-  app_id: string
-  app_secret: string
-}
-
-export interface EmbeddedAssistantConfig {
-  account: string
-  basic_app: EmbeddedAssistantAppConfig
-  advanced_app: EmbeddedAssistantAppConfig
 }
 
 export interface SettingRecord {
   domain: string
+  access_token: string
   base_assistant_id: string
   advanced_assistant_id: string
-  embedded_app_id: string
-  embedded_app_secret: string
-  base_embedded_app_id: string
-  base_embedded_app_secret: string
-  advanced_embedded_app_id: string
-  advanced_embedded_app_secret: string
   aes_enable: boolean
   aes_key: string
   base_assistant_config: BaseAssistantConfig
   advanced_assistant_config: AdvancedAssistantConfig
-  embedded_account: string
 }
 
 export interface SettingApiResponse {
@@ -163,26 +139,7 @@ export const createDefaultAdvancedAssistantConfig = (): AdvancedAssistantConfig 
   timeout: 30000,
   aes_enable: false,
   aes_key: '',
-  workspace_ids: [],
-  datasource_ids: [],
-  workspace_names: [],
-  datasource_names: [],
-  auto_ds: false,
-  default_datasource_id: null,
-  default_datasource_name: '',
   credential_mappings: [],
-})
-
-export const createDefaultEmbeddedAssistantConfig = (): EmbeddedAssistantConfig => ({
-  account: 'admin',
-  basic_app: {
-    app_id: '',
-    app_secret: '',
-  },
-  advanced_app: {
-    app_id: '',
-    app_secret: '',
-  },
 })
 
 export const normalizeBaseAssistantConfig = (
@@ -234,30 +191,9 @@ export const normalizeAdvancedAssistantConfig = (
   timeout: toNumberValue(config?.timeout, 30000),
   aes_enable: toBooleanValue(config?.aes_enable, legacyAesEnable),
   aes_key: toStringValue(config?.aes_key) || toStringValue(legacyAesKey),
-  workspace_ids: toIdArray(config?.workspace_ids),
-  datasource_ids: toIdArray(config?.datasource_ids),
-  workspace_names: toIdArray(config?.workspace_names),
-  datasource_names: toIdArray(config?.datasource_names),
-  auto_ds: toBooleanValue(config?.auto_ds),
-  default_datasource_id: config?.default_datasource_id != null ? String(config.default_datasource_id) : null,
-  default_datasource_name: typeof config?.default_datasource_name === 'string' ? config.default_datasource_name : '',
   credential_mappings: Array.isArray(config?.credential_mappings)
     ? config.credential_mappings.map((item) => normalizeCredentialMapping(item))
     : [],
-})
-
-export const normalizeEmbeddedAssistantConfig = (
-  data?: Partial<SettingRecord> | null
-): EmbeddedAssistantConfig => ({
-  account: toStringValue(data?.embedded_account) || 'admin',
-  basic_app: {
-    app_id: toStringValue(data?.base_embedded_app_id),
-    app_secret: toStringValue(data?.base_embedded_app_secret),
-  },
-  advanced_app: {
-    app_id: toStringValue(data?.advanced_embedded_app_id),
-    app_secret: toStringValue(data?.advanced_embedded_app_secret),
-  },
 })
 
 export const normalizeSettingRecord = (data?: Partial<SettingRecord> | null): SettingRecord => {
@@ -273,19 +209,13 @@ export const normalizeSettingRecord = (data?: Partial<SettingRecord> | null): Se
 
   return {
     domain: toStringValue(data?.domain),
+    access_token: toStringValue(data?.access_token),
     base_assistant_id: baseAssistantConfig.assistant_id || baseAssistantId,
     advanced_assistant_id: advancedAssistantConfig.assistant_id || advancedAssistantId,
-    embedded_app_id: toStringValue(data?.embedded_app_id),
-    embedded_app_secret: toStringValue(data?.embedded_app_secret),
-    base_embedded_app_id: toStringValue(data?.base_embedded_app_id),
-    base_embedded_app_secret: toStringValue(data?.base_embedded_app_secret),
-    advanced_embedded_app_id: toStringValue(data?.advanced_embedded_app_id),
-    advanced_embedded_app_secret: toStringValue(data?.advanced_embedded_app_secret),
     aes_enable: advancedAssistantConfig.aes_enable,
     aes_key: advancedAssistantConfig.aes_key,
     base_assistant_config: baseAssistantConfig,
     advanced_assistant_config: advancedAssistantConfig,
-    embedded_account: toStringValue(data?.embedded_account) || 'admin',
   }
 }
 

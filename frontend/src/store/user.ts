@@ -3,7 +3,7 @@ import { useCache } from '@/utils/useCache'
 import { store } from './index'
 import { user_list, fixed_pwd } from '@/utils/entity'
 const { wsCache } = useCache()
-const token_key = 'sqlbot-embedded-token'
+const token_key = 'lnkchatbi-embedded-token'
 
 interface UserState {
   uid: number

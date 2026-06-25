@@ -3,4 +3,4 @@ export const user_list = [
   { uid: 1758078367197, account: 'developer', name: '开发者', role: '普通研发' },
 ]
 
-export const fixed_pwd = 'SQLBotDemo@123'
+export const fixed_pwd = 'LnkChatBIDemo@123'

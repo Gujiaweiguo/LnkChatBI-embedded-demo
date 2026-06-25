@@ -3,11 +3,9 @@ import {
   createDefaultBaseAssistantConfig,
   createDefaultCredentialMapping,
   createDefaultAdvancedAssistantConfig,
-  createDefaultEmbeddedAssistantConfig,
   normalizeBaseAssistantConfig,
   normalizeCredentialMapping,
   normalizeAdvancedAssistantConfig,
-  normalizeEmbeddedAssistantConfig,
   normalizeSettingRecord,
 } from '../setting'
 
@@ -70,13 +68,6 @@ describe('createDefaultAdvancedAssistantConfig', () => {
       timeout: 30000,
       aes_enable: false,
       aes_key: '',
-      workspace_ids: [],
-      datasource_ids: [],
-      workspace_names: [],
-      datasource_names: [],
-      auto_ds: false,
-      default_datasource_id: null,
-      default_datasource_name: '',
       credential_mappings: [],
     })
   })
@@ -92,35 +83,6 @@ describe('createDefaultAdvancedAssistantConfig', () => {
     const a = createDefaultAdvancedAssistantConfig()
     const b = createDefaultAdvancedAssistantConfig()
     expect(a.credential_mappings).not.toBe(b.credential_mappings)
-  })
-
-  it('returns new workspace_ids and datasource_ids arrays each call', () => {
-    const a = createDefaultAdvancedAssistantConfig()
-    const b = createDefaultAdvancedAssistantConfig()
-    expect(a.workspace_ids).not.toBe(b.workspace_ids)
-    expect(a.datasource_ids).not.toBe(b.datasource_ids)
-    expect(a.workspace_names).not.toBe(b.workspace_names)
-    expect(a.datasource_names).not.toBe(b.datasource_names)
-  })
-})
-
-describe('createDefaultEmbeddedAssistantConfig', () => {
-  it('returns correct default shape with basic_app and advanced_app', () => {
-    const result = createDefaultEmbeddedAssistantConfig()
-    expect(result).toEqual({
-      account: 'admin',
-      basic_app: { app_id: '', app_secret: '' },
-      advanced_app: { app_id: '', app_secret: '' },
-    })
-  })
-
-  it('returns a new object each call', () => {
-    const a = createDefaultEmbeddedAssistantConfig()
-    const b = createDefaultEmbeddedAssistantConfig()
-    expect(a).toEqual(b)
-    expect(a).not.toBe(b)
-    expect(a.basic_app).not.toBe(b.basic_app)
-    expect(a.advanced_app).not.toBe(b.advanced_app)
   })
 })
 
@@ -380,26 +342,6 @@ describe('normalizeAdvancedAssistantConfig', () => {
     })
   })
 
-  it('normalizes workspace_ids and datasource_ids entries to numbers', () => {
-    const result = normalizeAdvancedAssistantConfig({
-      workspace_ids: ['1', 2, '  ', '7455261716515917824'] as unknown as string[],
-      datasource_ids: [17, '20', null] as unknown as string[],
-      auto_ds: true,
-    })
-    expect(result.workspace_ids).toEqual(['1', '2', '7455261716515917824'])
-    expect(result.datasource_ids).toEqual(['17', '20'])
-    expect(result.workspace_names).toEqual([])
-    expect(result.datasource_names).toEqual([])
-    expect(result.auto_ds).toBe(true)
-  })
-
-  it('returns empty datasource constraint arrays when omitted', () => {
-    const result = normalizeAdvancedAssistantConfig({})
-    expect(result.workspace_ids).toEqual([])
-    expect(result.datasource_ids).toEqual([])
-    expect(result.auto_ds).toBe(false)
-  })
-
   it('returns empty credential_mappings for non-array input', () => {
     const result = normalizeAdvancedAssistantConfig({
       credential_mappings: 'not-array' as unknown as [],
@@ -423,74 +365,10 @@ describe('normalizeAdvancedAssistantConfig', () => {
       timeout: 60000,
       aes_enable: true,
       aes_key: 'secret-key',
-      workspace_ids: ['1'],
-      datasource_ids: ['17', '20'],
-      workspace_names: ['w1'],
-      datasource_names: ['gs', 'thxtd'],
-      auto_ds: true,
-      default_datasource_id: null,
-      default_datasource_name: '',
       credential_mappings: [],
     }
     const result = normalizeAdvancedAssistantConfig(full)
     expect(result).toEqual(full)
-  })
-})
-
-describe('normalizeEmbeddedAssistantConfig', () => {
-  it('returns defaults for null input', () => {
-    const result = normalizeEmbeddedAssistantConfig(null)
-    expect(result).toEqual(createDefaultEmbeddedAssistantConfig())
-  })
-
-  it('returns defaults for undefined input', () => {
-    const result = normalizeEmbeddedAssistantConfig(undefined)
-    expect(result).toEqual(createDefaultEmbeddedAssistantConfig())
-  })
-
-  it('extracts base_embedded fields into basic_app', () => {
-    const result = normalizeEmbeddedAssistantConfig({
-      base_embedded_app_id: 'base-id',
-      base_embedded_app_secret: 'base-secret',
-    })
-    expect(result.basic_app).toEqual({
-      app_id: 'base-id',
-      app_secret: 'base-secret',
-    })
-  })
-
-  it('extracts advanced_embedded fields into advanced_app', () => {
-    const result = normalizeEmbeddedAssistantConfig({
-      advanced_embedded_app_id: 'adv-id',
-      advanced_embedded_app_secret: 'adv-secret',
-    })
-    expect(result.advanced_app).toEqual({
-      app_id: 'adv-id',
-      app_secret: 'adv-secret',
-    })
-  })
-
-  it('handles partial input with only base fields', () => {
-    const result = normalizeEmbeddedAssistantConfig({
-      base_embedded_app_id: 'base-id',
-    })
-    expect(result.basic_app.app_id).toBe('base-id')
-    expect(result.basic_app.app_secret).toBe('')
-    expect(result.advanced_app).toEqual({ app_id: '', app_secret: '' })
-  })
-
-  it('handles full input preserving all values', () => {
-    const result = normalizeEmbeddedAssistantConfig({
-      base_embedded_app_id: 'b-id',
-      base_embedded_app_secret: 'b-sec',
-      advanced_embedded_app_id: 'a-id',
-      advanced_embedded_app_secret: 'a-sec',
-    })
-    expect(result).toEqual({
-      account: 'admin',
-      basic_app: { app_id: 'b-id', app_secret: 'b-sec' },
-      advanced_app: { app_id: 'a-id', app_secret: 'a-sec' },
-    })
   })
 })
 
@@ -502,12 +380,6 @@ describe('normalizeSettingRecord', () => {
     expect(result.domain).toBe('')
     expect(result.base_assistant_id).toBe('')
     expect(result.advanced_assistant_id).toBe('')
-    expect(result.embedded_app_id).toBe('')
-    expect(result.embedded_app_secret).toBe('')
-    expect(result.base_embedded_app_id).toBe('')
-    expect(result.base_embedded_app_secret).toBe('')
-    expect(result.advanced_embedded_app_id).toBe('')
-    expect(result.advanced_embedded_app_secret).toBe('')
     expect(result.aes_enable).toBe(false)
     expect(result.aes_key).toBe('')
     expect(result.base_assistant_config).toEqual(defaultBase)
@@ -559,12 +431,6 @@ describe('normalizeSettingRecord', () => {
       domain: 'test.com',
       base_assistant_id: 'b-id',
       advanced_assistant_id: 'a-id',
-      embedded_app_id: 'emb-id',
-      embedded_app_secret: 'emb-sec',
-      base_embedded_app_id: 'b-emb-id',
-      base_embedded_app_secret: 'b-emb-sec',
-      advanced_embedded_app_id: 'a-emb-id',
-      advanced_embedded_app_secret: 'a-emb-sec',
       aes_enable: true,
       aes_key: 'aes-key',
       base_assistant_config: {
@@ -597,25 +463,12 @@ describe('normalizeSettingRecord', () => {
         timeout: 15000,
         aes_enable: false,
         aes_key: 'cfg-aes-key',
-        workspace_ids: ['7455261716515917824'],
-        datasource_ids: ['20'],
-        workspace_names: ['thxtd'],
-        datasource_names: ['thxtd'],
-        auto_ds: false,
-        default_datasource_id: null,
-        default_datasource_name: '',
         credential_mappings: [],
       },
     }
     const result = normalizeSettingRecord(data)
 
     expect(result.domain).toBe('test.com')
-    expect(result.embedded_app_id).toBe('emb-id')
-    expect(result.embedded_app_secret).toBe('emb-sec')
-    expect(result.base_embedded_app_id).toBe('b-emb-id')
-    expect(result.base_embedded_app_secret).toBe('b-emb-sec')
-    expect(result.advanced_embedded_app_id).toBe('a-emb-id')
-    expect(result.advanced_embedded_app_secret).toBe('a-emb-sec')
 
     expect(result.base_assistant_id).toBe('b-cfg-id')
     expect(result.base_assistant_config.name).toBe('Base')
@@ -627,11 +480,8 @@ describe('normalizeSettingRecord', () => {
     expect(result.advanced_assistant_id).toBe('a-cfg-id')
     expect(result.advanced_assistant_config.name).toBe('Adv')
     expect(result.advanced_assistant_config.timeout).toBe(15000)
-    expect(result.advanced_assistant_config.workspace_ids).toEqual(['7455261716515917824'])
-    expect(result.advanced_assistant_config.datasource_ids).toEqual(['20'])
-    expect(result.advanced_assistant_config.workspace_names).toEqual(['thxtd'])
-    expect(result.advanced_assistant_config.datasource_names).toEqual(['thxtd'])
-    expect(result.advanced_assistant_config.auto_ds).toBe(false)
+    expect(result.advanced_assistant_config.interface_endpoint).toBe('/api')
+    expect(result.advanced_assistant_config.credential_mappings).toEqual([])
 
     expect(result.aes_enable).toBe(false)
     expect(result.aes_key).toBe('cfg-aes-key')

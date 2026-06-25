@@ -10,7 +10,7 @@ const formRef = ref<FormInstance>()
 
 const loginForm = reactive({
   username: 'developer',
-  password: 'SQLBotDemo@123'
+  password: 'LnkChatBIDemo@123'
 })
 const userNameText = computed(() => user_list.map(item => item.account).join(','))
 

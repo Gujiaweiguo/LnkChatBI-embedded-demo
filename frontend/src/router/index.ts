@@ -1,15 +1,11 @@
 import { createRouter, createWebHashHistory, type RouteRecordRaw } from 'vue-router'
 import Layout from '../components/Layout.vue'
-import Setting from '../views/setting/index.vue'
 import BaseAssistantSetting from '../views/setting/base-assistant.vue'
 import AdvancedAssistantSetting from '../views/setting/advanced-assistant.vue'
-import EmbeddedAssistantSetting from '../views/setting/embedded-assistant.vue'
 import FloatPage from '../views/assistant/float.vue'
 import FullPage from '../views/assistant/full.vue'
 import AdvancedFloatPage from '../views/advanced/float.vue'
 import AdvancedFullPage from '../views/advanced/full.vue'
-import EmbeddedPage from '../views/embedded/index.vue'
-import EmbeddedDs from '../views/embedded/ds.vue'
 import { useUserStore } from '@/store/user'
 import { useSettingStore } from '@/store/setting'
 const userStore = useUserStore()
@@ -18,29 +14,21 @@ const settingStore = useSettingStore()
 const baseRoutes: RouteRecordRaw[] = [
   {
     path: '/',
-    redirect: '/setting'
+    redirect: '/setting/base-assistant'
   },
   {
     path: '/setting',
     component: Layout,
     meta: {
-      title: '系统设置',
+      title: '助手配置',
       icon: 'Setting'
     },
     children: [
       {
-        path: '',
-        name: 'setting',
-        meta: {
-          title: '通用设置'
-        },
-        component: Setting
-      },
-      {
         path: 'base-assistant',
         name: 'baseAssistantSetting',
         meta: {
-          title: '基础助手配置'
+          title: '基础小助手配置'
         },
         component: BaseAssistantSetting
       },
@@ -48,17 +36,9 @@ const baseRoutes: RouteRecordRaw[] = [
         path: 'advanced-assistant',
         name: 'advancedAssistantSetting',
         meta: {
-          title: '高级助手配置'
+          title: '高级小助手配置'
         },
         component: AdvancedAssistantSetting
-      },
-      {
-        path: 'embedded-assistant',
-        name: 'embeddedAssistantSetting',
-        meta: {
-          title: '嵌入式小助手配置'
-        },
-        component: EmbeddedAssistantSetting
       }
     ]
   }
@@ -119,57 +99,6 @@ const asyncRoutes: RouteRecordRaw[] = [
         component: AdvancedFullPage
       }
     ]
-  },
-  {
-    path: '/embedded',
-    meta: {
-      title: '页面嵌入',
-      icon: 'House',
-      requireEmbedded: true, // 需要嵌入式应用配置
-      requireOnline: true
-    },
-    component: Layout,
-    children: [
-      {
-        path: 'chat',
-        name: 'chat',
-        meta: {
-          title: '问数'
-        },
-        component: EmbeddedPage
-      },
-      {
-        path: 'ds',
-        name: 'ds',
-        meta: {
-          title: '数据源'
-        },
-        component: EmbeddedDs
-      }
-    ]
-  },
-  {
-    path: '/assistant-embed',
-    component: Layout,
-    meta: {
-      title: '嵌入式小助手',
-      icon: 'Monitor',
-      requireAssistantEmbed: true
-    },
-    children: [
-      {
-        path: 'chat',
-        name: 'embeddedAssistantChat',
-        meta: { title: '问数页' },
-        component: () => import('../views/assistant-embed/base.vue')
-      },
-      {
-        path: 'datasource',
-        name: 'embeddedAssistantDatasource',
-        meta: { title: '数据源页' },
-        component: () => import('../views/assistant-embed/advanced.vue')
-      }
-    ]
   }
 ]
 
@@ -182,30 +111,6 @@ const filterAsyncRoutes = (routes: RouteRecordRaw[]) => {
     }
     if (route.meta?.requireAdvancedAssistant && (!hasDomain || !settingStore.getAdvancedAssistantId)) {
       return false
-    }
-    if (route.meta?.requireOnline && !userStore.getOnline) {
-      return false
-    }
-    if (route.meta?.requireEmbedded && (!settingStore.getEmbeddedAppId || !settingStore.getEmbeddedAppSecret)) {
-      return false
-    }
-    if (route.meta?.requireAssistantEmbed) {
-      if (!hasDomain) {
-        return false
-      }
-      const hasEmbeddedAssistantChat = !!settingStore.getEmbeddedAssistantChatAppId && !!settingStore.getEmbeddedAssistantChatAppSecret
-      const hasEmbeddedAssistantDatasource = !!settingStore.getEmbeddedAssistantDatasourceAppId && !!settingStore.getEmbeddedAssistantDatasourceAppSecret
-      if (!hasEmbeddedAssistantChat && !hasEmbeddedAssistantDatasource) {
-        return false
-      }
-      route.children = route.children?.filter(child => {
-        if (child.name === 'embeddedAssistantChat') return hasEmbeddedAssistantChat
-        if (child.name === 'embeddedAssistantDatasource') return hasEmbeddedAssistantDatasource
-        return true
-      })
-      if (!route.children?.length) {
-        return false
-      }
     }
     return true
   })
