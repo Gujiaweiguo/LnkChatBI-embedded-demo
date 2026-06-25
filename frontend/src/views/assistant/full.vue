@@ -14,7 +14,7 @@ const settingStore = useSettingStore()
 const userStore = useUserStore()
 const historyShow = ref(true)
 const assistantId = computed(() => settingStore.getBaseAssistantId)
-const sqlbotDomain = computed(() => settingStore.getDomain)
+const lnkchatbiDomain = computed(() => settingStore.getDomain)
 const online = computed(() => userStore.getOnline)
 const userFlag = computed(() => {
   if (!online.value) {
@@ -22,11 +22,11 @@ const userFlag = computed(() => {
   }
   return userStore.getUid
 })
-const iframeId = computed(() => `sqlbot-embedded-chat-iframe-${assistantId.value}`)
-const getTargetOrigin = () => new URL(sqlbotDomain.value).origin
+const iframeId = computed(() => `lnkchatbi-embedded-chat-iframe-${assistantId.value}`)
+const getTargetOrigin = () => new URL(lnkchatbiDomain.value).origin
 const getIframe = () => document.getElementById(iframeId.value) as HTMLIFrameElement | null
 const buildCertificate = () => {
-  const sourceVal = window.localStorage.getItem('sqlbot-embedded-token')
+  const sourceVal = window.localStorage.getItem('lnkchatbi-embedded-token')
   if (!sourceVal) {
     return null
   }
@@ -42,7 +42,7 @@ const buildCertificate = () => {
   return JSON.stringify([
     {
       target: 'header',
-      key: 'sqlbot-embedded-token',
+      key: 'lnkchatbi-embedded-token',
       value: `Bearer ${token}`,
     },
   ])
@@ -54,7 +54,7 @@ const postToIframe = (payload: Record<string, unknown>) => {
   }
   iframe.contentWindow.postMessage(
     {
-      eventName: 'sqlbot_embedded_event',
+      eventName: 'lnkchatbi_embedded_event',
       messageId: assistantId.value,
       ...payload,
     },
@@ -65,7 +65,7 @@ const handleEmbeddedMessage = (event: MessageEvent) => {
   if (event.origin !== getTargetOrigin()) {
     return
   }
-  if (event.data?.eventName !== 'sqlbot_embedded_event') {
+  if (event.data?.eventName !== 'lnkchatbi_embedded_event') {
     return
   }
   if (event.data?.messageId !== assistantId.value) {
@@ -82,7 +82,7 @@ const handleEmbeddedMessage = (event: MessageEvent) => {
   }
 }
 const init = () => {
-  if (!sqlbotDomain.value || !assistantId.value) {
+  if (!lnkchatbiDomain.value || !assistantId.value) {
     return
   }
   const root = document.querySelector('.base-full-page') as HTMLElement | null
@@ -90,7 +90,7 @@ const init = () => {
     return
   }
   const iframe = document.createElement('iframe')
-  let srcUrl = `${sqlbotDomain.value}/#/embeddedPage?id=${assistantId.value}&online=${online.value}`
+  let srcUrl = `${lnkchatbiDomain.value}/#/embeddedPage?id=${assistantId.value}&online=${online.value}&mode=fullscreen`
   if (online.value) {
     srcUrl += `&userFlag=${userFlag.value}`
   }
