@@ -25,7 +25,7 @@ describe('tokenHandler', () => {
   })
 
   it('should set req.user for a valid admin Bearer token', () => {
-    mockReq.headers['sqlbot-embedded-token'] = `Bearer ${b64({ account: 'admin' })}`
+    mockReq.headers['lnkchatbi-embedded-token'] = `Bearer ${b64({ account: 'admin' })}`
     tokenHandler(mockReq, mockRes, mockNext)
     expect(mockReq.user).toEqual({
       uid: 1758078353942,
@@ -37,7 +37,7 @@ describe('tokenHandler', () => {
   })
 
   it('should set req.user for a valid developer Bearer token', () => {
-    mockReq.headers['sqlbot-embedded-token'] = `Bearer ${b64({ account: 'developer' })}`
+    mockReq.headers['lnkchatbi-embedded-token'] = `Bearer ${b64({ account: 'developer' })}`
     tokenHandler(mockReq, mockRes, mockNext)
     expect(mockReq.user).toEqual({
       uid: 1758078367197,
@@ -49,14 +49,14 @@ describe('tokenHandler', () => {
   })
 
   it('should leave req.user undefined for an unknown account', () => {
-    mockReq.headers['sqlbot-embedded-token'] = `Bearer ${b64({ account: 'unknown' })}`
+    mockReq.headers['lnkchatbi-embedded-token'] = `Bearer ${b64({ account: 'unknown' })}`
     tokenHandler(mockReq, mockRes, mockNext)
     expect(mockReq.user).toBeUndefined()
     expect(mockNext).toHaveBeenCalledTimes(1)
   })
 
   it('should catch malformed base64 and call next() silently', () => {
-    mockReq.headers['sqlbot-embedded-token'] = 'Bearer !!!not-base64!!!'
+    mockReq.headers['lnkchatbi-embedded-token'] = 'Bearer !!!not-base64!!!'
     tokenHandler(mockReq, mockRes, mockNext)
     expect(mockReq.user).toBeUndefined()
     expect(mockNext).toHaveBeenCalledTimes(1)
@@ -64,14 +64,14 @@ describe('tokenHandler', () => {
 
   it('should catch valid base64 that is not valid JSON', () => {
     const badJson = Buffer.from('not-json-at-all', 'utf-8').toString('base64')
-    mockReq.headers['sqlbot-embedded-token'] = `Bearer ${badJson}`
+    mockReq.headers['lnkchatbi-embedded-token'] = `Bearer ${badJson}`
     tokenHandler(mockReq, mockRes, mockNext)
     expect(mockReq.user).toBeUndefined()
     expect(mockNext).toHaveBeenCalledTimes(1)
   })
 
   it('should leave req.user undefined when token lacks Bearer prefix', () => {
-    mockReq.headers['sqlbot-embedded-token'] = b64({ account: 'admin' })
+    mockReq.headers['lnkchatbi-embedded-token'] = b64({ account: 'admin' })
     tokenHandler(mockReq, mockRes, mockNext)
     expect(mockReq.user).toBeUndefined()
     expect(mockNext).toHaveBeenCalledTimes(1)
@@ -156,34 +156,6 @@ describe('requestHandler', () => {
       success: false,
       message: 'Validation failed',
       errors: err.errors,
-    })
-  })
-
-  it('should return 401 for JsonWebTokenError', () => {
-    const err = new Error('jwt malformed')
-    err.name = 'JsonWebTokenError'
-
-    requestHandler(err, mockReq, mockRes, mockNext)
-
-    expect(mockRes.status).toHaveBeenCalledWith(401)
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      message: 'Authentication failed',
-      error: 'jwt malformed',
-    })
-  })
-
-  it('should return 401 for TokenExpiredError', () => {
-    const err = new Error('jwt expired')
-    err.name = 'TokenExpiredError'
-
-    requestHandler(err, mockReq, mockRes, mockNext)
-
-    expect(mockRes.status).toHaveBeenCalledWith(401)
-    expect(mockRes.json).toHaveBeenCalledWith({
-      success: false,
-      message: 'Authentication failed',
-      error: 'jwt expired',
     })
   })
 

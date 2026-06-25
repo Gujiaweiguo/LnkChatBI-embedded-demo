@@ -8,7 +8,7 @@ const mockUserInfo = (userInfo) => {
 }
 const tokenHandler = (req, res, next) => {
   try {
-    let token = req.headers['sqlbot-embedded-token'];
+    let token = req.headers['lnkchatbi-embedded-token'];
     const prefix = 'Bearer ';
     
     if (token && token.startsWith(prefix)) {
@@ -55,15 +55,6 @@ const requestHandler = (err, req, res, next) => {
       success: false,
       message: 'Validation failed',
       errors: err.errors || err.details
-    });
-  }
-
-  // JWT 认证错误
-  if (err.name === 'JsonWebTokenError' || err.name === 'TokenExpiredError') {
-    return res.status(401).json({
-      success: false,
-      message: 'Authentication failed',
-      error: err.message
     });
   }
 

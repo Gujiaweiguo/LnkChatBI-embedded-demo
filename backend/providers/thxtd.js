@@ -3,7 +3,10 @@ const pool = require('../config/db_pool');
 const { registerProvider } = require('./index');
 
 const THXTD_DATASOURCE_ID = '20';
-const SQLBOT_DATASOURCE_AES_KEY = 'SQLBot1234567890';
+// Historical AES-128-ECB key used by the upstream thxtd metadata store to
+// encrypt core_datasource.configuration. Value is fixed by external data and
+// must NOT be changed; only renamed for brand alignment.
+const LNKCHATBI_DATASOURCE_AES_KEY = 'SQLBot1234567890';
 
 let thxtdDescriptorCache = null;
 
@@ -14,7 +17,7 @@ function decryptDatasourceConfiguration(encryptedText) {
 
   const decipher = crypto.createDecipheriv(
     'aes-128-ecb',
-    Buffer.from(SQLBOT_DATASOURCE_AES_KEY, 'utf8'),
+    Buffer.from(LNKCHATBI_DATASOURCE_AES_KEY, 'utf8'),
     null
   );
   decipher.setAutoPadding(true);
@@ -84,7 +87,7 @@ async function getDescriptor() {
   );
 
   if (!datasourceResult.rows.length) {
-    throw new Error(`Datasource ${THXTD_DATASOURCE_ID} not found in synced mysqlbot metadata`);
+    throw new Error(`Datasource ${THXTD_DATASOURCE_ID} not found in synced thxtd metadata`);
   }
 
   const ds = datasourceResult.rows[0];

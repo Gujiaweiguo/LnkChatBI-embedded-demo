@@ -68,6 +68,10 @@ function backfillBaseConfig(row) {
 /**
  * Build a minimal advanced_assistant_config from legacy scalar fields,
  * migrating aes_enable / aes_key into the richer model.
+ *
+ * Advanced assistant (type=1) is external-API-only: it does not carry
+ * workspace/datasource/auto_ds/default_ds config (see LnkChatBI commit
+ * 167987b5). Only AES + endpoint + certificate mappings matter here.
  */
 function backfillAdvancedConfig(row) {
   return {
@@ -79,146 +83,28 @@ function backfillAdvancedConfig(row) {
     timeout: 30000,
     aes_enable: !!row.aes_enable,
     aes_key: row.aes_key || '',
-    workspace_ids: [],
-    datasource_ids: [],
-    workspace_names: [],
-    datasource_names: [],
-    auto_ds: false,
-    default_datasource_id: null,
-    default_datasource_name: '',
     credential_mappings: [],
   };
 }
 
-async function getNamesByIds(tableName, ids) {
-  const normalizedIds = normalizeIdArray(ids);
-  if (!normalizedIds.length) {
-    return [];
-  }
-
-  const result = await pool.query(
-    `SELECT id::text AS id, name FROM ${tableName} WHERE id::text = ANY($1::text[])`,
-    [normalizedIds]
-  );
-  const nameById = new Map(result.rows.map((row) => [String(row.id), row.name]));
-  return normalizedIds.map((id) => nameById.get(String(id)) || String(id));
+async function getNamesByIds(_tableName, _ids) {
+  // Demo database (lnkchatbi_demo) does not carry sys_assistant / sys_workspace /
+  // core_datasource tables — those live in the LnkChatBI main database. The
+  // previous enrichment flow that called this helper was removed when the
+  // demo switched to populating the assistant picker via the LnkChatBI
+  // /api/v1/system/assistant listing endpoint (see controller/assistant.js).
+  return [];
 }
 
-async function enrichBaseAssistantConfig(config, assistantId) {
-  if (!assistantId) {
-    return config;
-  }
-
-  const result = await pool.query(
-    'SELECT name, description, domain, configuration, oid::text AS oid FROM sys_assistant WHERE id::text = $1 LIMIT 1',
-    [String(assistantId)]
-  );
-
-  if (!result.rows.length) {
-    return config;
-  }
-
-  const row = result.rows[0];
-  const remoteConfig = parseJsonCol(row.configuration) || {};
-  const workspaceIds = normalizeIdArray(config.workspace_ids).length
-    ? normalizeIdArray(config.workspace_ids)
-    : (row.oid ? [String(row.oid)] : normalizeIdArray(remoteConfig.workspace_ids || (remoteConfig.oid != null ? [remoteConfig.oid] : [])));
-  const datasourceIds = normalizeIdArray(config.datasource_ids).length
-    ? normalizeIdArray(config.datasource_ids)
-    : normalizeIdArray(remoteConfig.datasource_ids || remoteConfig.public_list || []);
-  const publicList = normalizeIdArray(config.public_list).length
-    ? normalizeIdArray(config.public_list)
-    : normalizeIdArray(remoteConfig.public_list || []);
-  const privateList = normalizeIdArray(config.private_list).length
-    ? normalizeIdArray(config.private_list)
-    : normalizeIdArray(remoteConfig.private_list || []);
-  // auto_ds and default_datasource_id are read-only on the demo page;
-  // always prefer the value from sys_assistant.configuration (remoteConfig).
-  const defaultDatasourceId = remoteConfig.default_datasource_id != null
-    ? String(remoteConfig.default_datasource_id)
-    : (config.default_datasource_id != null ? String(config.default_datasource_id) : null)
-
-  return {
-    ...config,
-    name: config.name || row.name || '',
-    description: config.description || row.description || '',
-    cross_domain_enabled: config.cross_domain_enabled ?? !!row.domain,
-    cross_domain_origins: config.cross_domain_origins || row.domain || '',
-    workspace_ids: workspaceIds,
-    datasource_ids: datasourceIds,
-    workspace_names: await getNamesByIds('sys_workspace', workspaceIds),
-    datasource_names: await getNamesByIds('core_datasource', datasourceIds),
-    public_list: publicList,
-    public_list_names: await getNamesByIds('core_datasource', publicList),
-    private_list: privateList,
-    private_list_names: await getNamesByIds('core_datasource', privateList),
-    auto_ds: remoteConfig.auto_ds != null ? !!remoteConfig.auto_ds : (typeof config.auto_ds === 'boolean' ? config.auto_ds : false),
-    default_datasource_id: defaultDatasourceId,
-    default_datasource_name: defaultDatasourceId ? (await getNamesByIds('core_datasource', [defaultDatasourceId]))[0] || '' : '',
-  };
+function enrichBaseAssistantConfig(config, _assistantId) {
+  // No in-place enrichment from sys_assistant — the demo does not join across
+  // databases. The config is persisted as the operator saved it; the picker
+  // is populated separately via the listing proxy.
+  return config;
 }
 
-async function enrichAdvancedAssistantConfig(config, assistantId) {
-  if (!assistantId) {
-    return config;
-  }
-
-  const result = await pool.query(
-    'SELECT name, description, domain, configuration, oid::text AS oid FROM sys_assistant WHERE id::text = $1 LIMIT 1',
-    [String(assistantId)]
-  );
-
-  if (!result.rows.length) {
-    return config;
-  }
-
-  const row = result.rows[0];
-  const remoteConfig = parseJsonCol(row.configuration) || {};
-  const workspaceIds = normalizeIdArray(config.workspace_ids).length
-    ? normalizeIdArray(config.workspace_ids)
-    : (row.oid ? [String(row.oid)] : normalizeIdArray(remoteConfig.workspace_ids || (remoteConfig.oid != null ? [remoteConfig.oid] : [])));
-  const datasourceIds = normalizeIdArray(config.datasource_ids).length
-    ? normalizeIdArray(config.datasource_ids)
-    : normalizeIdArray(remoteConfig.datasource_ids || []);
-  // auto_ds and default_datasource_id are read-only on the demo page;
-  // always prefer the value from sys_assistant.configuration (remoteConfig).
-  const defaultDatasourceId = remoteConfig.default_datasource_id != null
-    ? String(remoteConfig.default_datasource_id)
-    : (config.default_datasource_id != null ? String(config.default_datasource_id) : null)
-
-  return {
-    ...config,
-    name: config.name || row.name || '',
-    description: config.description || row.description || '',
-    cross_domain_enabled: config.cross_domain_enabled ?? !!row.domain,
-    cross_domain_origins: config.cross_domain_origins || row.domain || '',
-    interface_endpoint: config.interface_endpoint || remoteConfig.endpoint || '',
-    timeout: config.timeout || (remoteConfig.timeout ? Number(remoteConfig.timeout) * 1000 : 30000),
-    aes_enable: typeof config.aes_enable === 'boolean' ? config.aes_enable : !!remoteConfig.encrypt,
-    aes_key: config.aes_key || remoteConfig.aes_key || '',
-    workspace_ids: workspaceIds,
-    datasource_ids: datasourceIds,
-    workspace_names: await getNamesByIds('sys_workspace', workspaceIds),
-    datasource_names: await getNamesByIds('core_datasource', datasourceIds),
-    auto_ds: remoteConfig.auto_ds != null ? !!remoteConfig.auto_ds : (typeof config.auto_ds === 'boolean' ? config.auto_ds : false),
-    default_datasource_id: defaultDatasourceId,
-    default_datasource_name: defaultDatasourceId ? (await getNamesByIds('core_datasource', [defaultDatasourceId]))[0] || '' : '',
-    credential_mappings: Array.isArray(config.credential_mappings) && config.credential_mappings.length
-      ? config.credential_mappings
-      : Array.isArray(remoteConfig.certificate)
-        ? remoteConfig.certificate.map((item) => ({
-            source_type: item.type || '',
-            source_name: item.source || '',
-            target_location: item.target || 'header',
-            target_name: item.target_key || '',
-            target_value_expression: item.target_val || '',
-          }))
-        : [],
-  };
-}
-
-function normalizeEmbeddedField(val) {
-  return val == null ? '' : val;
+function enrichAdvancedAssistantConfig(config, _assistantId) {
+  return config;
 }
 
 /**
@@ -246,24 +132,14 @@ const createTable = async () => {
       domain VARCHAR(255) NOT NULL,
       base_assistant_id VARCHAR(255),
       advanced_assistant_id VARCHAR(255),
-      embedded_app_id VARCHAR(255),
-      embedded_app_secret VARCHAR(255),
-      base_embedded_app_id VARCHAR(255),
-      base_embedded_app_secret VARCHAR(255),
-      advanced_embedded_app_id VARCHAR(255),
-      advanced_embedded_app_secret VARCHAR(255),
       aes_enable BOOL,
       aes_key VARCHAR(255)
     );
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS aes_enable BOOL;
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS aes_key VARCHAR(255);
-    ALTER TABLE setting ADD COLUMN IF NOT EXISTS base_embedded_app_id VARCHAR(255);
-    ALTER TABLE setting ADD COLUMN IF NOT EXISTS base_embedded_app_secret VARCHAR(255);
-    ALTER TABLE setting ADD COLUMN IF NOT EXISTS advanced_embedded_app_id VARCHAR(255);
-    ALTER TABLE setting ADD COLUMN IF NOT EXISTS advanced_embedded_app_secret VARCHAR(255);
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS base_assistant_config TEXT;
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS advanced_assistant_config TEXT;
-    ALTER TABLE setting ADD COLUMN IF NOT EXISTS embedded_account VARCHAR(255);
+    ALTER TABLE setting ADD COLUMN IF NOT EXISTS access_token VARCHAR(2048);
   `
   await pool.query(setting_ddl)
 };
@@ -275,10 +151,7 @@ const backfillConfigs = async () => {
   try {
     const result = await pool.query(`
       SELECT id, base_assistant_config, advanced_assistant_config, aes_enable, aes_key,
-             base_assistant_id, advanced_assistant_id,
-             base_embedded_app_id, base_embedded_app_secret,
-             advanced_embedded_app_id, advanced_embedded_app_secret,
-             embedded_account
+             base_assistant_id, advanced_assistant_id
       FROM setting
     `);
     for (const row of result.rows) {
@@ -292,26 +165,6 @@ const backfillConfigs = async () => {
       if (!row.advanced_assistant_config) {
         updates.push(`advanced_assistant_config = $${idx++}`);
         params.push(JSON.stringify(await enrichAdvancedAssistantConfig(backfillAdvancedConfig(row), row.advanced_assistant_id)));
-      }
-      if (row.base_embedded_app_id == null) {
-        updates.push(`base_embedded_app_id = $${idx++}`);
-        params.push('');
-      }
-      if (row.base_embedded_app_secret == null) {
-        updates.push(`base_embedded_app_secret = $${idx++}`);
-        params.push('');
-      }
-      if (row.advanced_embedded_app_id == null) {
-        updates.push(`advanced_embedded_app_id = $${idx++}`);
-        params.push('');
-      }
-      if (row.advanced_embedded_app_secret == null) {
-        updates.push(`advanced_embedded_app_secret = $${idx++}`);
-        params.push('');
-      }
-      if (row.embedded_account == null) {
-        updates.push(`embedded_account = $${idx++}`);
-        params.push('admin');
       }
       if (updates.length) {
         params.push(row.id);
@@ -331,18 +184,13 @@ createTable().then(() => backfillConfigs());
  */
 async function decorate(row) {
   if (!row) return row;
-   row.base_embedded_app_id = normalizeEmbeddedField(row.base_embedded_app_id);
-   row.base_embedded_app_secret = normalizeEmbeddedField(row.base_embedded_app_secret);
-   row.advanced_embedded_app_id = normalizeEmbeddedField(row.advanced_embedded_app_id);
-   row.advanced_embedded_app_secret = normalizeEmbeddedField(row.advanced_embedded_app_secret);
-   row.embedded_account = row.embedded_account || 'admin';
-  const baseCfg = parseJsonCol(row.base_assistant_config);
-  const advCfg = parseJsonCol(row.advanced_assistant_config);
-  row.base_assistant_config = await enrichBaseAssistantConfig(baseCfg || backfillBaseConfig(row), row.base_assistant_id);
-  row.advanced_assistant_config = await enrichAdvancedAssistantConfig(advCfg || backfillAdvancedConfig(row), row.advanced_assistant_id);
-  row.base_assistant_id = deriveBaseAssistantId(row.base_assistant_config, row.base_assistant_id);
-  row.advanced_assistant_id = deriveAdvancedAssistantId(row.advanced_assistant_config, row.advanced_assistant_id);
-  return row;
+   const baseCfg = parseJsonCol(row.base_assistant_config);
+   const advCfg = parseJsonCol(row.advanced_assistant_config);
+   row.base_assistant_config = await enrichBaseAssistantConfig(baseCfg || backfillBaseConfig(row), row.base_assistant_id);
+   row.advanced_assistant_config = await enrichAdvancedAssistantConfig(advCfg || backfillAdvancedConfig(row), row.advanced_assistant_id);
+   row.base_assistant_id = deriveBaseAssistantId(row.base_assistant_config, row.base_assistant_id);
+   row.advanced_assistant_id = deriveAdvancedAssistantId(row.advanced_assistant_config, row.advanced_assistant_id);
+   return row;
 }
 
 const Setting = {
@@ -360,17 +208,11 @@ const Setting = {
       domain,
       base_assistant_id,
       advanced_assistant_id,
-      embedded_app_id,
-      embedded_app_secret,
-      base_embedded_app_id,
-      base_embedded_app_secret,
-      advanced_embedded_app_id,
-      advanced_embedded_app_secret,
       aes_enable,
       aes_key,
+      access_token,
       base_assistant_config,
       advanced_assistant_config,
-      embedded_account,
     } = settingData;
 
     let baseCfg = parseJsonCol(base_assistant_config) || backfillBaseConfig(settingData);
@@ -383,12 +225,10 @@ const Setting = {
 
     const result = await pool.query(
       `INSERT INTO setting
-        (domain, base_assistant_id, advanced_assistant_id, embedded_app_id, embedded_app_secret, base_embedded_app_id, base_embedded_app_secret, advanced_embedded_app_id, advanced_embedded_app_secret, aes_enable, aes_key, base_assistant_config, advanced_assistant_config, embedded_account)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14) RETURNING *`,
-      [domain, resolvedBaseId, resolvedAdvId, embedded_app_id, embedded_app_secret,
-       normalizeEmbeddedField(base_embedded_app_id), normalizeEmbeddedField(base_embedded_app_secret),
-       normalizeEmbeddedField(advanced_embedded_app_id), normalizeEmbeddedField(advanced_embedded_app_secret),
-       aes_enable, aes_key, JSON.stringify(baseCfg), JSON.stringify(advCfg), embedded_account || 'admin']
+        (domain, base_assistant_id, advanced_assistant_id, aes_enable, aes_key, access_token, base_assistant_config, advanced_assistant_config)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+      [domain, resolvedBaseId, resolvedAdvId,
+       aes_enable, aes_key, access_token || '', JSON.stringify(baseCfg), JSON.stringify(advCfg)]
     );
     return decorate(result.rows[0]);
   },
@@ -398,17 +238,11 @@ const Setting = {
       domain,
       base_assistant_id,
       advanced_assistant_id,
-      embedded_app_id,
-      embedded_app_secret,
-      base_embedded_app_id,
-      base_embedded_app_secret,
-      advanced_embedded_app_id,
-      advanced_embedded_app_secret,
       aes_enable,
       aes_key,
+      access_token,
       base_assistant_config,
       advanced_assistant_config,
-      embedded_account,
     } = settingData;
 
     let baseCfg = parseJsonCol(base_assistant_config) || backfillBaseConfig(settingData);
@@ -422,17 +256,12 @@ const Setting = {
     const result = await pool.query(
       `UPDATE setting SET
         domain = $1, base_assistant_id = $2, advanced_assistant_id = $3,
-        embedded_app_id = $4, embedded_app_secret = $5,
-        base_embedded_app_id = $6, base_embedded_app_secret = $7,
-        advanced_embedded_app_id = $8, advanced_embedded_app_secret = $9,
-        aes_enable = $10, aes_key = $11,
-        base_assistant_config = $12, advanced_assistant_config = $13,
-        embedded_account = $14
-       WHERE id = $15 RETURNING *`,
-      [domain, resolvedBaseId, resolvedAdvId, embedded_app_id, embedded_app_secret,
-       normalizeEmbeddedField(base_embedded_app_id), normalizeEmbeddedField(base_embedded_app_secret),
-       normalizeEmbeddedField(advanced_embedded_app_id), normalizeEmbeddedField(advanced_embedded_app_secret),
-       aes_enable, aes_key, JSON.stringify(baseCfg), JSON.stringify(advCfg), embedded_account || 'admin', id]
+        aes_enable = $4, aes_key = $5,
+        access_token = $6,
+        base_assistant_config = $7, advanced_assistant_config = $8
+       WHERE id = $9 RETURNING *`,
+      [domain, resolvedBaseId, resolvedAdvId,
+       aes_enable, aes_key, access_token || '', JSON.stringify(baseCfg), JSON.stringify(advCfg), id]
     );
     return decorate(result.rows[0]);
   },
