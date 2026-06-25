@@ -187,7 +187,7 @@ Param:  <若 certificate.target=param>
 
 ### 7.3 高级助手问数失败
 
-- LnkChatBI 后台的高级助手 `endpoint` 是否指向本 Demo 的 `http://<demo-host>:3100/api/datasource/`
+- LnkChatBI 后台的高级助手 `endpoint` 是否正确（相对路径 `/api/datasource/` 或完整 URL `http://<demo-host>:3100/api/datasource/` 均可；若使用相对路径，需确保 LnkChatBI 助手的跨域白名单已包含宿主页域名）
 - 本 Demo 后端是否在运行（`/health` 端点返回 OK）
 - 若启用 AES，确认双方 AES Key / IV 完全一致
 - 本 Demo 后端日志查看 `GET /api/datasource/` 是否被调用、响应是否正常
