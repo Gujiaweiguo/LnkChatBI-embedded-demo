@@ -2,21 +2,13 @@
 
 本文档给出本仓库 `LnkChatBI-embedded-demo` 与 LnkChatBI 主产品的对接配置步骤，覆盖**基础小助手**和**高级小助手**两条接入路径。
 
-## 0. 重要：access_token 怎么获取
+## 0. 准备工作：把宿主页域名加入 LnKChatBI 助手的跨域白名单
 
-Demo 不持有 LnkChatBI 的账号密码，但需要一份**临时 access_token** 来调用 LnkChatBI 的助手列表接口（用于 demo 配置页的下拉选择）。该 token 来自 LnkChatBI 浏览器登录后的 localStorage，获取步骤：
+Demo 配置页通过浏览器直连 LnkChatBI 的免登录 Origin-bound 接口 `GET /api/v1/system/assistant/embed/list` 拉取助手列表。浏览器自动附加 `Origin` header，LnKChatBI 依据每个助手配置的跨域白名单过滤后返回该 origin 能看到的助手。
 
-1. 用 `admin`（或具备工作空间管理员权限的账号）在浏览器登录 LnkChatBI
-2. 按 `F12` 打开浏览器控制台，进入 `Application` / `应用` 标签 → `Local Storage` → 选中 LnkChatBI 站点
-3. 找到 key 为 `user.token` 的条目，复制它的 value（一个 JWT 字符串，开头是 `eyJ...`）
+因此**必须在 LnkChatBI 后台把宿主页域名（如 `http://localhost:5180`、`http://119.29.59.128:5180`）添加到对应助手的跨域白名单中**，否则配置页拉取列表会得到空数组。
 
-或者直接在 Console 里执行：
-
-```js
-copy(localStorage.getItem('user.token'))
-```
-
-> 该 token 默认有效 7 天，过期后需要重新获取。**这是过渡方案**，未来 LnkChatBI 落地 [add-embedded-assistant-listing-endpoint](../LnkChatBI/openspec/changes/add-embedded-assistant-listing-endpoint/proposal.md) 提案后，demo 将切换为免登录的 Origin 白名单接口，不再需要 access_token。
+无需 access_token，无需从 LnkChatBI 浏览器拷贝任何凭据。
 
 ## 1. 前置条件
 
@@ -68,10 +60,9 @@ LnkChatBI 调用宿主接口时，会按照高级助手配置中给出的 `certi
 打开 `#/setting/base-assistant`，依次填写：
 
 1. **LnkChatBI 服务地址**：`<LnkChatBI-domain>`（如 `http://localhost:8000`，**末尾不带 `/`**）
-2. **access_token**：从 LnkChatBI 浏览器拷贝过来的 token（参见第 0 节）
-3. 点击**「拉取助手列表」**按钮，demo 会通过后端代理调用 `GET <domain>/api/v1/system/assistant?type=0`，把 type=0 的助手填充到下拉框
-4. 从下拉框选择要嵌入的基础小助手
-5. 点击**「保存基础小助手配置」**
+2. 点击**「拉取助手列表」**按钮，浏览器会直连 LnkChatBI 免登录接口 `GET <domain>/api/v1/system/assistant/embed/list?type=0`，把 type=0 的助手填充到下拉框（仅显示已把宿主页 origin 加入跨域白名单的助手）
+3. 从下拉框选择要嵌入的基础小助手
+4. 点击**「保存基础小助手配置」**
 
 保存后菜单会出现「基础小助手」入口。
 
@@ -80,15 +71,14 @@ LnkChatBI 调用宿主接口时，会按照高级助手配置中给出的 `certi
 打开 `#/setting/advanced-assistant`，依次填写：
 
 1. **LnkChatBI 服务地址**：默认同步自基础小助手配置（如需独立指定也可在此页修改）
-2. **access_token**：同上，默认同步自基础小助手配置
-3. 点击**「拉取助手列表」**按钮，拉取 type=1 的助手
-4. 从下拉框选择要嵌入的高级小助手
-5. **（可选）启用 AES**：与 LnkChatBI 高级应用配置保持一致（启用则需填入相同的 AES Key）
-6. 点击**「保存高级小助手配置」**
+2. 点击**「拉取助手列表」**按钮，拉取 type=1 的助手（同样走 embed/list 免登录接口）
+3. 从下拉框选择要嵌入的高级小助手
+4. **（可选）启用 AES**：与 LnkChatBI 高级应用配置保持一致（启用则需填入相同的 AES Key）
+5. 点击**「保存高级小助手配置」**
 
 保存后菜单会出现「高级小助手」入口。
 
-> 服务地址与 access_token 在两个配置页之间共享（同步到 demo 后端的同一条 setting 记录），任意一页修改后另一页也会同步。
+> 服务地址在两个配置页之间共享（同步到 demo 后端的同一条 setting 记录），任意一页修改后另一页也会同步。
 
 ## 4. LnkChatBI 跨域设置
 
@@ -175,9 +165,10 @@ Param:  <若 certificate.target=param>
 ### 7.1 拉取助手列表失败
 
 - 检查 LnkChatBI 服务地址是否填对（末尾不带 `/`）
-- 检查 access_token 是否过期（默认 7 天），过期后需要重新从 LnkChatBI 浏览器拷贝
-- 检查 LnkChatBI 后端是否在运行（`<domain>/api/v1/system/assistant` 不带 token 应返回 `Authentication invalid`，证明服务在线）
-- demo 后端日志查看 `/api/assistant/list` 接口的具体错误
+- **检查 LnkChatBI 助手的跨域白名单是否包含当前宿主页 origin**（如 `http://localhost:5180`）—— embed/list 接口会按白名单过滤，未匹配的 origin 会得到空数组
+- 检查 LnkChatBI 后端是否在运行（`<domain>/api/v1/system/assistant/embed/list` 带 `Origin` header 应返回 `{"code":0,"data":[...]}`）
+- 浏览器 Console 查看是否有 CORS 报错
+- 浏览器 Network 查看 `embed/list` 请求的实际响应内容
 
 ### 7.2 浮窗/全屏页空白
 

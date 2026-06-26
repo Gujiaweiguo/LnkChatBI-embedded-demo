@@ -44,7 +44,6 @@ export interface AdvancedAssistantConfig {
 
 export interface SettingRecord {
   domain: string
-  access_token: string
   base_assistant_id: string
   advanced_assistant_id: string
   aes_enable: boolean
@@ -209,7 +208,6 @@ export const normalizeSettingRecord = (data?: Partial<SettingRecord> | null): Se
 
   return {
     domain: toStringValue(data?.domain),
-    access_token: toStringValue(data?.access_token),
     base_assistant_id: baseAssistantConfig.assistant_id || baseAssistantId,
     advanced_assistant_id: advancedAssistantConfig.assistant_id || advancedAssistantId,
     aes_enable: advancedAssistantConfig.aes_enable,

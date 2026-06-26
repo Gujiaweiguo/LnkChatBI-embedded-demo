@@ -11,19 +11,16 @@ const formRef = ref<FormInstance>()
 
 interface BaseAssistantFormState {
   domain: string
-  access_token: string
   assistant_id: string
 }
 
 const form = reactive<BaseAssistantFormState>({
   domain: '',
-  access_token: '',
   assistant_id: '',
 })
 
 const rules: FormRules = {
   domain: [{ required: true, message: '请输入 LnkChatBI 服务地址', trigger: 'blur' }],
-  access_token: [{ required: true, message: '请填入 access_token', trigger: 'blur' }],
   assistant_id: [{ required: true, message: '请选择基础小助手', trigger: 'change' }],
 }
 
@@ -38,14 +35,12 @@ const currentAssistantName = computed(() => {
 
 const syncForm = () => {
   form.domain = settingStore.getDomain
-  form.access_token = settingStore.getAccessToken
   form.assistant_id = settingStore.getBaseAssistantId
 }
 
 const ensureStorePersisted = (): SettingRecord => ({
   ...settingStore.getData,
   domain: form.domain.trim().replace(/\/+$/, ''),
-  access_token: form.access_token.trim(),
   base_assistant_id: form.assistant_id,
   base_assistant_config: {
     ...settingStore.getBaseAssistantConfig,
@@ -55,19 +50,18 @@ const ensureStorePersisted = (): SettingRecord => ({
 })
 
 const fetchList = async (silent = false) => {
-  if (!form.domain || !form.access_token) {
+  if (!form.domain) {
     if (!silent) {
-      ElMessage.warning('请先填写服务地址和 access_token')
+      ElMessage.warning('请先填写 LnkChatBI 服务地址')
     }
     return
   }
   loadingList.value = true
   listError.value = ''
   try {
-    // 先把当前 domain/token 落库，让后端代理能用最新凭据拉取
-    await SettingApi.save(ensureStorePersisted())
-    await settingStore.init()
-    const res = await AssistantApi.list({ type: 'base' })
+    // 直连 LnkChatBI 免登录 embed/list 接口，浏览器自动带 Origin header
+    // 由 LnKChatBI 依据助手白名单过滤，不再需要 demo 后端代理 / access_token
+    const res = await AssistantApi.list({ domain: form.domain, type: 'base' })
     assistantOptions.value = (res?.data || []).filter((item) => item.type === 0)
     if (!silent) {
       ElMessage.success(`已加载 ${assistantOptions.value.length} 个基础小助手`)
@@ -113,7 +107,7 @@ onMounted(() => {
         <div class="setting-page__hero-copy">
           <h2 class="setting-page__title">基础小助手配置</h2>
           <p class="setting-page__description">
-            填写 LnkChatBI 服务地址与 access_token，从 LnkChatBI 拉取已创建的基础小助手列表，下拉选择当前 demo 要嵌入的小助手。
+            填写 LnkChatBI 服务地址，从 LnkChatBI 免登录拉取已创建的基础小助手列表，下拉选择当前 demo 要嵌入的小助手。
           </p>
         </div>
       </div>
@@ -125,23 +119,13 @@ onMounted(() => {
           <div class="setting-page__panel-copy">
             <h3 class="setting-page__panel-title">LnkChatBI 连接</h3>
             <p class="setting-page__panel-description">
-              所有助手列表请求都通过 demo 后端代理调用 LnkChatBI <code>GET /api/v1/system/assistant</code>。
+              助手列表通过浏览器直连 LnkChatBI <code>GET /api/v1/system/assistant/embed/list</code>，浏览器自动带 Origin header，LnkChatBI 依据各助手白名单过滤。
             </p>
           </div>
 
           <div class="setting-page__grid">
             <el-form-item label="LnkChatBI 服务地址" prop="domain" class="setting-page__full">
               <el-input v-model="form.domain" placeholder="例如：http://localhost:8000" clearable />
-            </el-form-item>
-
-            <el-form-item label="access_token" prop="access_token" class="setting-page__full">
-              <el-input
-                v-model="form.access_token"
-                placeholder="从 LnkChatBI 浏览器 localStorage 的 user.token 拷贝"
-                type="password"
-                show-password
-                clearable
-              />
             </el-form-item>
           </div>
         </div>
@@ -196,7 +180,7 @@ onMounted(() => {
 
     <div class="setting-page__footer">
       <div class="setting-page__footer-note">
-        保存后会通过 <code>/api/setting</code> 同步服务地址、access_token 与基础小助手 ID，菜单随后出现「基础小助手」入口。
+        保存后会通过 <code>/api/setting</code> 同步服务地址与基础小助手 ID，菜单随后出现「基础小助手」入口。
       </div>
       <el-button type="primary" size="large" @click="handleSubmit(formRef)">保存基础小助手配置</el-button>
     </div>

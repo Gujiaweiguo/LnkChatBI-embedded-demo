@@ -11,7 +11,6 @@ import {
 
 interface SettingState extends SettingRecord {
   domain: string
-  access_token: string
   base_assistant_id: string
   advanced_assistant_id: string
   aes_enable: boolean
@@ -60,9 +59,6 @@ export const SettingStore = defineStore('setting', {
     getDomain(): string {
       return this.domain
     },
-    getAccessToken(): string {
-      return this.access_token
-    },
     getBaseAssistantId(): string {
       return this.base_assistant_config.assistant_id || this.base_assistant_id
     },
@@ -94,7 +90,6 @@ export const SettingStore = defineStore('setting', {
     getData(): SettingRecord {
       return cloneSettingRecord({
         domain: this.domain,
-        access_token: this.access_token,
         base_assistant_id: this.getBaseAssistantId,
         advanced_assistant_id: this.getAdvancedAssistantId,
         aes_enable: this.advanced_assistant_config.aes_enable,
@@ -125,7 +120,6 @@ export const SettingStore = defineStore('setting', {
       }
       const normalized = normalizeSettingRecord(data)
       this.domain = normalized.domain
-      this.access_token = normalized.access_token
       this.base_assistant_id = normalized.base_assistant_id
       this.advanced_assistant_id = normalized.advanced_assistant_id
       this.aes_enable = normalized.aes_enable

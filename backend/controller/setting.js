@@ -21,7 +21,6 @@ const settingController = {
         advanced_assistant_id,
         aes_enable,
         aes_key,
-        access_token,
         base_assistant_config,
         advanced_assistant_config,
       } = req.body;
@@ -38,7 +37,6 @@ const settingController = {
         advanced_assistant_id,
         aes_enable,
         aes_key,
-        access_token,
         base_assistant_config,
         advanced_assistant_config,
       };

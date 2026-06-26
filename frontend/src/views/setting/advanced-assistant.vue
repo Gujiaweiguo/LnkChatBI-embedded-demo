@@ -11,7 +11,6 @@ const formRef = ref<FormInstance>()
 
 interface AdvancedAssistantFormState {
   domain: string
-  access_token: string
   assistant_id: string
   aes_enable: boolean
   aes_key: string
@@ -19,7 +18,6 @@ interface AdvancedAssistantFormState {
 
 const form = reactive<AdvancedAssistantFormState>({
   domain: '',
-  access_token: '',
   assistant_id: '',
   aes_enable: false,
   aes_key: '',
@@ -27,7 +25,6 @@ const form = reactive<AdvancedAssistantFormState>({
 
 const rules: FormRules = {
   domain: [{ required: true, message: '请输入 LnkChatBI 服务地址', trigger: 'blur' }],
-  access_token: [{ required: true, message: '请填入 access_token', trigger: 'blur' }],
   assistant_id: [{ required: true, message: '请选择高级小助手', trigger: 'change' }],
   aes_key: [{ required: true, message: '启用 AES 时必须填写 Key', trigger: 'blur' }],
 }
@@ -51,9 +48,8 @@ const generateRandomKey = (length = 32): string => {
 }
 
 const syncForm = () => {
-  // domain 和 access_token 默认从基础助手配置同步过来（用户可在本页覆盖）
+  // domain 默认从基础助手配置同步过来（用户可在本页覆盖）
   form.domain = settingStore.getDomain
-  form.access_token = settingStore.getAccessToken
   form.assistant_id = settingStore.getAdvancedAssistantId
   const advancedConfig = settingStore.getAdvancedAssistantConfig
   form.aes_enable = advancedConfig.aes_enable
@@ -63,7 +59,6 @@ const syncForm = () => {
 const ensureStorePersisted = (): SettingRecord => ({
   ...settingStore.getData,
   domain: form.domain.trim().replace(/\/+$/, ''),
-  access_token: form.access_token.trim(),
   advanced_assistant_id: form.assistant_id,
   aes_enable: form.aes_enable,
   aes_key: form.aes_enable ? form.aes_key.trim() : '',
@@ -77,18 +72,18 @@ const ensureStorePersisted = (): SettingRecord => ({
 })
 
 const fetchList = async (silent = false) => {
-  if (!form.domain || !form.access_token) {
+  if (!form.domain) {
     if (!silent) {
-      ElMessage.warning('请先填写服务地址和 access_token')
+      ElMessage.warning('请先填写 LnkChatBI 服务地址')
     }
     return
   }
   loadingList.value = true
   listError.value = ''
   try {
-    await SettingApi.save(ensureStorePersisted())
-    await settingStore.init()
-    const res = await AssistantApi.list({ type: 'advanced' })
+    // 直连 LnkChatBI 免登录 embed/list 接口，浏览器自动带 Origin header
+    // 由 LnKChatBI 依据助手白名单过滤，不再需要 demo 后端代理 / access_token
+    const res = await AssistantApi.list({ domain: form.domain, type: 'advanced' })
     assistantOptions.value = (res?.data || []).filter((item) => item.type === 1)
     if (!silent) {
       ElMessage.success(`已加载 ${assistantOptions.value.length} 个高级小助手`)
@@ -138,7 +133,7 @@ onMounted(() => {
         <div class="setting-page__hero-copy">
           <h2 class="setting-page__title">高级小助手配置</h2>
           <p class="setting-page__description">
-            填写 LnkChatBI 服务地址与 access_token，从 LnkChatBI 拉取已创建的高级小助手列表，下拉选择当前 demo 要嵌入的小助手，并配置 AES 加密密钥。
+            填写 LnkChatBI 服务地址，从 LnkChatBI 免登录拉取已创建的高级小助手列表，下拉选择当前 demo 要嵌入的小助手，并配置 AES 加密密钥。
           </p>
         </div>
       </div>
@@ -150,23 +145,13 @@ onMounted(() => {
           <div class="setting-page__panel-copy">
             <h3 class="setting-page__panel-title">LnkChatBI 连接</h3>
             <p class="setting-page__panel-description">
-              服务地址与 access_token 默认同步自基础小助手配置，可在此页独立修改。
+              服务地址默认同步自基础小助手配置，可在此页独立修改。
             </p>
           </div>
 
           <div class="setting-page__grid">
             <el-form-item label="LnkChatBI 服务地址" prop="domain" class="setting-page__full">
               <el-input v-model="form.domain" placeholder="例如：http://localhost:8000" clearable />
-            </el-form-item>
-
-            <el-form-item label="access_token" prop="access_token" class="setting-page__full">
-              <el-input
-                v-model="form.access_token"
-                placeholder="从 LnkChatBI 浏览器 localStorage 的 user.token 拷贝"
-                type="password"
-                show-password
-                clearable
-              />
             </el-form-item>
           </div>
         </div>
@@ -251,7 +236,7 @@ onMounted(() => {
 
     <div class="setting-page__footer">
       <div class="setting-page__footer-note">
-        保存后会通过 <code>/api/setting</code> 同步服务地址、access_token、高级小助手 ID 与 AES 配置，菜单随后出现「高级小助手」入口。
+        保存后会通过 <code>/api/setting</code> 同步服务地址、高级小助手 ID 与 AES 配置，菜单随后出现「高级小助手」入口。
       </div>
       <el-button type="primary" size="large" @click="handleSubmit(formRef)">保存高级小助手配置</el-button>
     </div>

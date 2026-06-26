@@ -92,14 +92,14 @@ async function getNamesByIds(_tableName, _ids) {
   // core_datasource tables — those live in the LnkChatBI main database. The
   // previous enrichment flow that called this helper was removed when the
   // demo switched to populating the assistant picker via the LnkChatBI
-  // /api/v1/system/assistant listing endpoint (see controller/assistant.js).
+  // login-free embed/list endpoint (frontend/src/api/assistant.ts).
   return [];
 }
 
 function enrichBaseAssistantConfig(config, _assistantId) {
   // No in-place enrichment from sys_assistant — the demo does not join across
   // databases. The config is persisted as the operator saved it; the picker
-  // is populated separately via the listing proxy.
+  // is populated separately by the frontend calling embed/list directly.
   return config;
 }
 
@@ -139,6 +139,9 @@ const createTable = async () => {
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS aes_key VARCHAR(255);
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS base_assistant_config TEXT;
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS advanced_assistant_config TEXT;
+    -- access_token column retained for rollback safety (OpenSpec change
+    -- 'add-embedded-assistant-listing-endpoint' replaced it with a login-free
+    -- Origin-bound endpoint). No longer read or written by application code.
     ALTER TABLE setting ADD COLUMN IF NOT EXISTS access_token VARCHAR(2048);
   `
   await pool.query(setting_ddl)
@@ -210,7 +213,6 @@ const Setting = {
       advanced_assistant_id,
       aes_enable,
       aes_key,
-      access_token,
       base_assistant_config,
       advanced_assistant_config,
     } = settingData;
@@ -225,10 +227,10 @@ const Setting = {
 
     const result = await pool.query(
       `INSERT INTO setting
-        (domain, base_assistant_id, advanced_assistant_id, aes_enable, aes_key, access_token, base_assistant_config, advanced_assistant_config)
-       VALUES ($1,$2,$3,$4,$5,$6,$7,$8) RETURNING *`,
+        (domain, base_assistant_id, advanced_assistant_id, aes_enable, aes_key, base_assistant_config, advanced_assistant_config)
+       VALUES ($1,$2,$3,$4,$5,$6,$7) RETURNING *`,
       [domain, resolvedBaseId, resolvedAdvId,
-       aes_enable, aes_key, access_token || '', JSON.stringify(baseCfg), JSON.stringify(advCfg)]
+       aes_enable, aes_key, JSON.stringify(baseCfg), JSON.stringify(advCfg)]
     );
     return decorate(result.rows[0]);
   },
@@ -240,7 +242,6 @@ const Setting = {
       advanced_assistant_id,
       aes_enable,
       aes_key,
-      access_token,
       base_assistant_config,
       advanced_assistant_config,
     } = settingData;
@@ -257,11 +258,10 @@ const Setting = {
       `UPDATE setting SET
         domain = $1, base_assistant_id = $2, advanced_assistant_id = $3,
         aes_enable = $4, aes_key = $5,
-        access_token = $6,
-        base_assistant_config = $7, advanced_assistant_config = $8
-       WHERE id = $9 RETURNING *`,
+        base_assistant_config = $6, advanced_assistant_config = $7
+       WHERE id = $8 RETURNING *`,
       [domain, resolvedBaseId, resolvedAdvId,
-       aes_enable, aes_key, access_token || '', JSON.stringify(baseCfg), JSON.stringify(advCfg), id]
+       aes_enable, aes_key, JSON.stringify(baseCfg), JSON.stringify(advCfg), id]
     );
     return decorate(result.rows[0]);
   },

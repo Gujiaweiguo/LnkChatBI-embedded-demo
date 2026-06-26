@@ -150,9 +150,8 @@ LnkChatBI 后端通过 `backend/apps/system/crud/assistant.py::AssistantOutDs.ge
 
 简要流程：
 
-1. 在 LnkChatBI 中创建对应类型的助手（基础应用 / 高级应用）
-2. 从 LnkChatBI 浏览器拷贝 access_token（详见操作说明第 0 节）
-3. 在本 Demo 的 `#/setting/base-assistant` 或 `#/setting/advanced-assistant` 填入服务地址 + access_token，下拉选择助手并保存
+1. 在 LnkChatBI 中创建对应类型的助手（基础应用 / 高级应用），并把宿主页域名（如 `http://localhost:5180`）加入助手的跨域白名单
+2. 在本 Demo 的 `#/setting/base-assistant` 或 `#/setting/advanced-assistant` 填入服务地址，下拉选择助手并保存（助手列表通过 LnKChatBI 免登录 `embed/list` 接口直接拉取，无需 access_token）
 4. 进入对应的演示页面验证嵌入效果
 
 ## 测试
