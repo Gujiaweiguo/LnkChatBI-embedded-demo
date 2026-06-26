@@ -25,7 +25,7 @@
 - There is **no linter, formatter, GitHub Actions workflow, or pre-commit hook** in this repo.
 
 ## Architecture notes
-- Backend routes are **auto-registered** from every `backend/controller/*.js` file. Each controller exports `{ prefix, mapping }`; `backend/server.js` loads them dynamically. There is no central router file to update. The remaining controllers are `setting.js`, `assistant.js` (assistant-list proxy), and `datasource.js`.
+- Backend routes are **auto-registered** from every `backend/controller/*.js` file. Each controller exports `{ prefix, mapping }`; `backend/server.js` loads them dynamically. There is no central router file to update. The current controllers are `setting.js` (config CRUD) and `datasource.js` (advanced-assistant datasource endpoint + AES).
 - The active PostgreSQL pool wrapper is `backend/config/db_pool.js`. `backend/config/database.js` also exists, but current models use `db_pool.js` instead.
 - Frontend routing is in `frontend/src/router/index.ts` and uses **hash history** plus dynamic route registration based on the Pinia setting/user stores. The root path `/` redirects to `/setting/base-assistant`. Routes are gated on whether the basic/advanced assistant IDs are configured.
 - Frontend API calls go through `frontend/src/utils/request.ts`, which injects the `lnkchatbi-embedded-token` header from client storage (demo-local login).
@@ -47,7 +47,7 @@
 ## Data and startup behavior
 - The backend requires PostgreSQL credentials from env on startup and exits on connection failure (`backend/config/db_pool.js`).
 - Demo tables/settings are created and seeded from backend model code on startup/import, so schema/data behavior is partly driven by model side effects.
-- The `setting` table only carries `domain`, `base_assistant_id`, `advanced_assistant_id`, `aes_enable`, `aes_key`, plus the JSON columns `base_assistant_config` and `advanced_assistant_config`. Older deployments may still have legacy `embedded_*` columns; they are unused and harmlessly ignored.
+- The `setting` table carries `domain`, `base_assistant_id`, `advanced_assistant_id`, `aes_enable`, `aes_key`, the JSON columns `base_assistant_config` and `advanced_assistant_config`, plus a soft-deprecated `access_token` column (retained for rollback safety after OpenSpec proposal `add-embedded-assistant-listing-endpoint` replaced the access_token transitional path with a login-free Origin-bound endpoint; no longer read or written by application code). Older deployments may still have legacy `embedded_*` columns; they are unused and harmlessly ignored.
 
 ## Change guidance
 - If you add a backend API, follow the existing controller auto-registration pattern instead of creating a new manual router layer.
